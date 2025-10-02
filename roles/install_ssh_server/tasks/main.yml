@@ -1,0 +1,63 @@
+---
+- name: "Skip SSH server setup on unsupported platforms"
+  ansible.builtin.debug:
+    msg: "SSH server provisioning is only implemented for Unix-like systems"
+  when: ansible_os_family in ["Darwin", "Windows"]
+
+- name: "Determine SSH server package names"
+  ansible.builtin.set_fact:
+    install_ssh_server_packages: "{{ ssh_server_packages.get(ansible_distribution) | default(['openssh-server']) }}"
+  when: ansible_os_family not in ["Darwin", "Windows"]
+
+- name: "Install SSH server packages"
+  ansible.builtin.package:
+    name: "{{ install_ssh_server_packages }}"
+    state: present
+  become: true
+  when: ansible_os_family not in ["Darwin", "Windows"]
+
+- name: "Ensure ~/.ssh directory exists"
+  ansible.builtin.file:
+    path: "{{ ssh_dir }}"
+    state: directory
+    owner: "{{ local_user }}"
+    group: "{{ local_user }}"
+    mode: "0700"
+  when: ansible_os_family not in ["Darwin", "Windows"]
+
+- name: "Ensure SSH vault public key is available"
+  ansible.builtin.assert:
+    that:
+      - vault_ssh_public_key is defined
+    fail_msg: "SSH public key secret is missing from the vault."
+  when: ansible_os_family not in ["Darwin", "Windows"]
+
+- name: "Ensure authorized_keys exists"
+  ansible.builtin.file:
+    path: "{{ install_ssh_server_authorized_keys_path }}"
+    state: touch
+    owner: "{{ local_user }}"
+    group: "{{ local_user }}"
+    mode: "0644"
+  when: ansible_os_family not in ["Darwin", "Windows"]
+
+- name: "Add public key to authorized_keys"
+  ansible.posix.authorized_key:
+    user: "{{ local_user }}"
+    state: present
+    key: "{{ vault_ssh_public_key }}"
+  become: true
+  when: ansible_os_family not in ["Darwin", "Windows"]
+
+- name: "Determine SSH service name"
+  ansible.builtin.set_fact:
+    install_ssh_service_name: "{{ ssh_service_names.get(ansible_distribution) | default('sshd') }}"
+  when: ansible_os_family not in ["Darwin", "Windows"]
+
+- name: "Ensure SSH service is enabled and running"
+  ansible.builtin.service:
+    name: "{{ install_ssh_service_name }}"
+    state: started
+    enabled: true
+  become: true
+  when: ansible_os_family not in ["Darwin", "Windows"]

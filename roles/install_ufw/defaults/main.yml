@@ -1,0 +1,9 @@
+---
+install_ufw_supported_distributions:
+  - Debian
+  - Ubuntu
+  - Linuxmint
+  - Pop!_OS
+  - Archlinux
+  - ManjaroLinux
+install_ufw_package_name: ufw

@@ -1,0 +1,115 @@
+# Set up the prompt
+
+autoload -Uz promptinit
+promptinit
+# prompt adam1
+
+# --- Unique, two-line, emoji-accented prompt (no other settings changed) ---
+# Shows: exit status, Python venv, git branch/status, shortened path, time, and a quirky symbol.
+# Works without external deps; falls back gracefully outside git repos.
+
+# Colors
+autoload -U colors && colors
+local _ok="%F{112}" _warn="%F{203}" _git="%F{171}" _path="%F{39}" _venv="%F{78}" _dim="%F{244}" _reset="%f"
+
+# Shorten PWD (e.g., ~/p/…/src)
+short_pwd() {
+  local p="${PWD/#$HOME/~}" IFS='/' arr last2 n
+  arr=(${=p}); n=${#arr[@]}
+  if (( n <= 3 )); then print -r -- "$p"; return; fi
+  last2="${arr[$((n-1))]}"
+  [[ $n -ge 2 ]] && last2="${arr[$((n-2))]}/$last2"
+  if [[ "${arr[1]}" = "~" ]]; then
+    print -r -- "~/${arr[2]}/…/${last2}"
+  else
+    print -r -- "${arr[1]:0:1}/…/${last2}"
+  fi
+}
+
+# Git bits
+_git_branch() { command git rev-parse --abbrev-ref HEAD 2>/dev/null }
+_git_dirty() { command git diff --quiet --ignore-submodules --exit-code 2>/dev/null || print -n "*" }
+_git_ahead_behind() {
+  local up a b s=""
+  up=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null) || return
+  a=$(git rev-list --left-only --count @{u}...HEAD 2>/dev/null)
+  b=$(git rev-list --right-only --count @{u}...HEAD 2>/dev/null)
+  (( ${a:-0} > 0 )) && s+="↑$a"
+  (( ${b:-0} > 0 )) && s+="↓$b"
+  [[ -n $s ]] && print -r -- " $s"
+}
+
+# Python venv
+_venv_name() { [[ -n "$VIRTUAL_ENV" ]] && print -r -- "${VIRTUAL_ENV:t}" }
+
+# Timing
+typeset -F SECS_START
+preexec() { SECS_START=$EPOCHREALTIME }
+precmd() {
+  local delta=""
+  if [[ -n $SECS_START ]]; then
+    local now=$EPOCHREALTIME d
+    d=$(( now - SECS_START ))
+    if (( d >= 1 )); then
+      delta="${_dim}${(l:0:: :)${(l:0:: :)}}${d%.}s${_reset}"
+    elif (( d > 0 )); then
+      # milliseconds
+      local ms; ms=$(( d * 1000 ))
+      delta="${_dim}${ms%.*}ms${_reset}"
+    fi
+  fi
+
+  local status_seg=""
+  if (( $? == 0 )); then
+    status_seg="${_ok}✔${_reset}"
+  else
+    status_seg="${_warn}✘${_reset}"
+  fi
+
+  local venv_seg="" vb; vb=$(_venv_name)
+  [[ -n $vb ]] && venv_seg=" ${_venv}󰆧 ${vb}${_reset}"
+
+  local git_seg="" br; br=$(_git_branch)
+  if [[ -n $br ]]; then
+    git_seg=" ${_git} ${br}$(_git_dirty)$(_git_ahead_behind)${_reset}"
+  fi
+
+  local path_seg="${_path}$(short_pwd)${_reset}"
+  local time_seg="${_dim}$(date +'%H:%M:%S')${_reset}"
+
+  # Two-line prompt:
+  # Line 1: status • venv • git • path • time
+  # Line 2: quirky prompt char varies by uid/host
+  local sym="⚡"
+  [[ $EUID -eq 0 ]] && sym="☠"
+  [[ -n $SSH_CONNECTION ]] && sym="✈"
+
+  PROMPT="${status_seg}${venv_seg}${git_seg} ${path_seg} ${_dim}•${_reset} ${time_seg}"
+  PROMPT+=$'\n'"${sym} %F{250}%n@%m${_reset} %F{250}%#${_reset} "
+}
+
+setopt histignorealldups sharehistory
+
+# Use emacs keybindings even if our EDITOR is set to vi
+bindkey -e
+
+# Keep 1000 lines of history within the shell and save it to ~/.zsh_history:
+HISTSIZE=1000
+SAVEHIST=1000
+HISTFILE=~/.zsh_history
+
+# Use modern completion system
+autoload -Uz compinit
+compinit
+
+zstyle ':completion:*' auto-description 'specify: %d'
+zstyle ':completion:*' completer _expand _complete _correct _approximate
+zstyle ':completion:*' format 'Completing %d'
+zstyle ':completion:*' group-name ''
+zstyle ':completion:*' menu select=2
+eval "$(dircolors -b)"
+zstyle ':completion:*:default' list-colors ${(s.:.)LS_COLORS}
+zstyle ':completion:*' list-colors ''
+zstyle ':completion:*' list-prompt %SAt %p: Hit TAB for more, or the character to insert%s
+zstyle ':completion:*' matcher-list '' 'm:{a-z}={A-Z}' 'm:{a-zA-Z}={A-Za-z}' 'r:|[._-]=* r:|=* l:|=*'
+zstyle ':completion:*' menu select=long

@@ -1,0 +1,31 @@
+---
+- name: "Local machine bootstrap"
+  hosts: localhost
+  gather_facts: true
+  vars:
+    profile_roles:
+      personal:
+        - ensure_sudo
+        - install_ufw
+        - install_zsh
+        - setup_ssh_client
+      server:
+        - ensure_sudo
+        - install_ufw
+        - install_zsh
+        - install_ssh_server
+  tasks:
+    - name: "Validate requested profile"
+      ansible.builtin.assert:
+        that: "profile is defined and profile in profile_roles"
+        fail_msg: "Profile '{{ profile | default('undefined') }}' is not supported. Choose one of: {{ profile_roles.keys() | list }}"
+        success_msg: "Using profile '{{ profile }}'"
+
+    - name: "Show selected profile"
+      ansible.builtin.debug:
+        msg: "Applying roles: {{ profile_roles[profile] }}"
+
+    - name: "Apply roles for profile"
+      ansible.builtin.include_role:
+        name: "{{ item }}"
+      loop: "{{ profile_roles[profile] }}"

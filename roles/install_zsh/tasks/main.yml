@@ -1,0 +1,60 @@
+---
+- name: "Skip Zsh setup on Windows"
+  ansible.builtin.debug:
+    msg: "Skipping Zsh installation on Windows"
+  when: ansible_os_family == "Windows"
+
+- name: "Determine package name for Zsh"
+  ansible.builtin.set_fact:
+    install_zsh_package_name: "{{ zsh_package_names.get(ansible_distribution) | default('zsh') }}"
+  when: ansible_os_family not in ["Windows", "Darwin"]
+
+- name: "Install Zsh via package manager"
+  ansible.builtin.package:
+    name: "{{ install_zsh_package_name }}"
+    state: present
+  become: true
+  when: ansible_os_family not in ["Windows", "Darwin"]
+
+- name: "Install Zsh on macOS via Homebrew"
+  community.general.homebrew:
+    name: zsh
+    state: present
+  become: false
+  when: ansible_os_family == "Darwin"
+
+- name: "Collect available shells"
+  ansible.builtin.set_fact:
+    install_zsh_shell_candidates: "{{ ansible_facts.shells | default([]) }}"
+  when: ansible_os_family != "Windows"
+
+- name: "Determine installed Zsh path"
+  ansible.builtin.set_fact:
+    install_zsh_shell_path: "{{ (install_zsh_shell_candidates | select('match', 'zsh$') | list | first) | default(zsh_preferred_paths.get(ansible_system, '/bin/zsh')) }}"
+  when: ansible_os_family != "Windows"
+
+- name: "Check that determined shell path exists"
+  ansible.builtin.stat:
+    path: "{{ install_zsh_shell_path }}"
+  register: install_zsh_shell_stat
+  when: ansible_os_family != "Windows"
+
+- name: "Set default shell for {{ local_user }}"
+  ansible.builtin.user:
+    name: "{{ local_user }}"
+    shell: "{{ install_zsh_shell_path }}"
+  become: true
+  when:
+    - install_zsh_manage_shell
+    - ansible_os_family != "Windows"
+    - install_zsh_shell_stat is defined
+    - install_zsh_shell_stat.stat.exists | bool
+
+- name: "Deploy user .zshrc"
+  ansible.builtin.copy:
+    src: "{{ install_zsh_zshrc_src }}"
+    dest: "{{ install_zsh_rc_path }}"
+    owner: "{{ local_user }}"
+    group: "{{ local_user }}"
+    mode: "0644"
+  when: ansible_os_family != "Windows"

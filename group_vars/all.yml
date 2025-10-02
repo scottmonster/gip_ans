@@ -1,0 +1,2 @@
+---
+# For backwards compatibility, main variables now live in group_vars/all/main.yml.

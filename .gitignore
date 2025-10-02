@@ -1,0 +1,13 @@
+prompt.txt
+
+# Ansible artifacts
+*.retry
+__pycache__/
+.tmp/
+
+# Local vault password caches
+vault_pass.txt
+.vault_pass.txt
+
+# macOS metadata
+.DS_Store

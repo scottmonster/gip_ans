@@ -1,0 +1,2 @@
+---
+# This file intentionally left blank. Secrets now reside in group_vars/all/vault.yml.

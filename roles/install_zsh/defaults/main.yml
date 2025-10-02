@@ -1,0 +1,4 @@
+---
+install_zsh_manage_shell: true
+install_zsh_rc_path: "{{ home_dir }}/.zshrc"
+install_zsh_zshrc_src: zshrc

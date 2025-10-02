@@ -1,0 +1,2 @@
+---
+install_ssh_server_authorized_keys_path: "{{ authorized_keys_path }}"

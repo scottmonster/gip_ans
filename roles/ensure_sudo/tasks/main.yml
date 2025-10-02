@@ -1,0 +1,36 @@
+---
+- name: "Skip ensure_sudo on unsupported platforms"
+  ansible.builtin.debug:
+    msg: "Skipping sudo provisioning for {{ ansible_system }}"
+  when: ansible_os_family in ensure_sudo_skip_families
+
+- name: "Ensure sudo package is installed"
+  ansible.builtin.package:
+    name: sudo
+    state: present
+  become: true
+  when: ansible_os_family not in ensure_sudo_skip_families
+
+- name: "Determine sudo group name"
+  ansible.builtin.set_fact:
+    ensure_sudo_group: "{{ sudo_group_map.get(ansible_distribution) | default(sudo_group_map.get(ansible_os_family, 'sudo')) }}"
+  when: ansible_os_family not in ensure_sudo_skip_families
+
+- name: "Ensure sudo group exists"
+  ansible.builtin.group:
+    name: "{{ ensure_sudo_group }}"
+    state: present
+  become: true
+  when:
+  - ansible_os_family not in ensure_sudo_skip_families
+    - ensure_sudo_group is defined
+
+- name: "Ensure {{ local_user }} is part of sudo group"
+  ansible.builtin.user:
+    name: "{{ local_user }}"
+    groups: "{{ ensure_sudo_group }}"
+    append: true
+  become: true
+  when:
+  - ansible_os_family not in ensure_sudo_skip_families
+    - ensure_sudo_group is defined

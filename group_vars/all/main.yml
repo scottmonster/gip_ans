@@ -1,0 +1,83 @@
+---
+local_user: "{{ ansible_user_id }}"
+home_dir: "{{ ansible_env.HOME }}"
+ssh_dir: "{{ home_dir }}/.ssh"
+vault_password_local_path: "{{ (ansible_env.XDG_CONFIG_HOME | default(ansible_env.HOME + '/.config', true)) + '/qyksys/vault_pass.txt' }}"
+authorized_keys_path: "{{ ssh_dir }}/authorized_keys"
+
+ufw_rules:
+  - { rule: "limit", port: "22", proto: "tcp" }
+  - { rule: "allow", port: "80", proto: "tcp" }
+  - { rule: "allow", port: "443", proto: "tcp" }
+ufw_default_incoming: deny
+ufw_default_outgoing: allow
+
+ssh_client_packages:
+  Debian: ["openssh-client"]
+  Ubuntu: ["openssh-client"]
+  Linuxmint: ["openssh-client"]
+  Pop!_OS: ["openssh-client"]
+  RedHat: ["openssh-clients"]
+  CentOS: ["openssh-clients"]
+  Fedora: ["openssh-clients"]
+  Rocky: ["openssh-clients"]
+  AlmaLinux: ["openssh-clients"]
+  Archlinux: ["openssh"]
+  ManjaroLinux: ["openssh"]
+
+ssh_server_packages:
+  Debian: ["openssh-server"]
+  Ubuntu: ["openssh-server"]
+  Linuxmint: ["openssh-server"]
+  Pop!_OS: ["openssh-server"]
+  RedHat: ["openssh-server"]
+  CentOS: ["openssh-server"]
+  Fedora: ["openssh-server"]
+  Rocky: ["openssh-server"]
+  AlmaLinux: ["openssh-server"]
+  Archlinux: ["openssh"]
+  ManjaroLinux: ["openssh"]
+
+ssh_service_names:
+  Debian: ssh
+  Ubuntu: ssh
+  Linuxmint: ssh
+  Pop!_OS: ssh
+  RedHat: sshd
+  CentOS: sshd
+  Fedora: sshd
+  Rocky: sshd
+  AlmaLinux: sshd
+  Archlinux: sshd
+  ManjaroLinux: sshd
+
+zsh_package_names:
+  Debian: ["zsh"]
+  Ubuntu: ["zsh"]
+  Linuxmint: ["zsh"]
+  Pop!_OS: ["zsh"]
+  RedHat: ["zsh"]
+  CentOS: ["zsh"]
+  Fedora: ["zsh"]
+  Rocky: ["zsh"]
+  AlmaLinux: ["zsh"]
+  Archlinux: ["zsh"]
+  ManjaroLinux: ["zsh"]
+
+sudo_group_map:
+  Debian: sudo
+  Ubuntu: sudo
+  Linuxmint: sudo
+  Pop!_OS: sudo
+  RedHat: wheel
+  CentOS: wheel
+  Fedora: wheel
+  Rocky: wheel
+  AlmaLinux: wheel
+  Archlinux: wheel
+  ManjaroLinux: wheel
+
+# Default placeholder shell path; roles detect installed shell dynamically where possible
+zsh_preferred_paths:
+  Linux: "/usr/bin/zsh"
+  Darwin: "/bin/zsh"

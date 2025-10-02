@@ -1,0 +1,45 @@
+---
+- name: "Check whether UFW is supported"
+  ansible.builtin.set_fact:
+    install_ufw_supported: "{{ ansible_distribution in install_ufw_supported_distributions }}"
+
+- name: "Skipping UFW setup on unsupported distribution"
+  ansible.builtin.debug:
+    msg: "UFW is not supported on {{ ansible_distribution }}; skipping firewall configuration."
+  when: not install_ufw_supported
+
+- name: "Install UFW package"
+  ansible.builtin.package:
+    name: "{{ install_ufw_package_name }}"
+    state: present
+  become: true
+  when: install_ufw_supported
+
+- name: "Configure UFW default incoming policy"
+  community.general.ufw:
+    direction: incoming
+    policy: "{{ ufw_default_incoming }}"
+  become: true
+  when: install_ufw_supported
+
+- name: "Configure UFW default outgoing policy"
+  community.general.ufw:
+    direction: outgoing
+    policy: "{{ ufw_default_outgoing }}"
+  become: true
+  when: install_ufw_supported
+
+- name: "Ensure UFW application rules"
+  community.general.ufw:
+    rule: "{{ item.rule }}"
+    port: "{{ item.port }}"
+    proto: "{{ item.proto }}"
+  loop: "{{ ufw_rules }}"
+  become: true
+  when: install_ufw_supported
+
+- name: "Enable UFW"
+  community.general.ufw:
+    state: enabled
+  become: true
+  when: install_ufw_supported

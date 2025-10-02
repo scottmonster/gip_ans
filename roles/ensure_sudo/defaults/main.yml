@@ -1,0 +1,5 @@
+---
+# Default settings for ensure_sudo
+ensure_sudo_skip_families:
+  - Darwin
+  - Windows
