@@ -31,7 +31,6 @@ script_dir() {
   while [ -h "$src" ]; do
     local dir
     dir=$(cd -P "$(dirname "$src")" >/dev/null 2>&1 && pwd)
-    src="$(readlink "$src")"
     case "$src" in
       /*) ;; # already absolute
       *) src="$dir/$src" ;;
