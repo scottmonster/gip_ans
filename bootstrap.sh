@@ -31,6 +31,49 @@ ensure_path() {
   esac
 }
 
+is_repo_ready() {
+  local dir="$1"
+  [ -d "$dir" ] || return 1
+  [ -f "$dir/playbooks/site.yml" ] || return 1
+  [ -d "$dir/roles" ] || return 1
+  [ -f "$dir/vault/vault_pass.txt.vault" ] || return 1
+  return 0
+}
+
+ensure_repo() {
+  local candidate="$1"
+  if is_repo_ready "$candidate"; then
+    printf '%s\n' "$candidate"
+    return
+  fi
+
+  if [ -n "${BOOTSTRAP_REPO_PATH:-}" ]; then
+    if is_repo_ready "$BOOTSTRAP_REPO_PATH"; then
+      printf '%s\n' "$BOOTSTRAP_REPO_PATH"
+      return
+    fi
+    err "Provided BOOTSTRAP_REPO_PATH ($BOOTSTRAP_REPO_PATH) is missing required files."
+    exit 1
+  fi
+
+  local repo_url="${BOOTSTRAP_REPO_URL:-https://path-to-repo.git}"
+  if ! command -v git >/dev/null 2>&1; then
+    err "Repository assets not found locally and git is unavailable. Install git or set BOOTSTRAP_REPO_PATH."
+    exit 1
+  fi
+
+  local temp_dir
+  temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/gip_ans_repo.XXXXXX")
+  log "Cloning repository from $repo_url into $temp_dir"
+  if ! git clone --depth=1 "$repo_url" "$temp_dir" >/tmp/bootstrap_git.log 2>&1; then
+    err "Failed to clone repository from $repo_url. See /tmp/bootstrap_git.log for details."
+    rm -rf "$temp_dir"
+    exit 1
+  fi
+  BOOTSTRAP_CLEANUP_REPO="$temp_dir"
+  printf '%s\n' "$temp_dir"
+}
+
 run_sudo() {
   if [ "${EUID:-$(id -u)}" -eq 0 ]; then
     "$@"
@@ -157,16 +200,15 @@ resolve_vault_password() {
 
   local tmp_pw
   tmp_pw=$(mktemp)
-  trap 'rm -f "$tmp_pw"' EXIT
   printf '%s' "$bootstrap_pass" > "$tmp_pw"
 
   if ! ansible-vault view "$repo_vault_file" --vault-password-file "$tmp_pw" > "$local_vault_file" 2>/tmp/vault_view.log; then
     err "Unable to decrypt vault password file. See /tmp/vault_view.log for details."
+    rm -f "$tmp_pw"
     rm -f "$local_vault_file"
     exit 1
   fi
   rm -f "$tmp_pw"
-  trap - EXIT
   chmod 600 "$local_vault_file"
   log "Vault password restored at $local_vault_file"
 }
@@ -198,6 +240,10 @@ choose_profile() {
 main() {
   local repo_dir
   repo_dir="$(script_dir)"
+  repo_dir="$(ensure_repo "$repo_dir")"
+  if [ -n "${BOOTSTRAP_CLEANUP_REPO:-}" ]; then
+    trap 'rm -rf "$BOOTSTRAP_CLEANUP_REPO"' EXIT
+  fi
   cd "$repo_dir"
 
   ensure_ansible
