@@ -34,12 +34,28 @@ ensure_path() {
 run_sudo() {
   if [ "${EUID:-$(id -u)}" -eq 0 ]; then
     "$@"
-  elif command -v sudo >/dev/null 2>&1; then
-    sudo "$@"
-  else
-    err "This step requires elevated privileges and sudo is not available. Run as root or install sudo manually."
-    exit 1
+    return
   fi
+
+  if command -v sudo >/dev/null 2>&1; then
+    if id -nG "${USER:-$(id -un)}" 2>/dev/null | tr ' ' '\n' | grep -qx "sudo"; then
+      sudo "$@"
+      return
+    fi
+  fi
+
+  if command -v su >/dev/null 2>&1; then
+    log "Elevating with su because current user lacks sudo group membership"
+    local current_dir cmd
+    current_dir=$(pwd)
+    cmd=$(printf ' %q' "$@")
+    cmd=${cmd# }
+    su root -c "cd $(printf '%q' "$current_dir") && $cmd"
+    return
+  fi
+
+  err "This step requires elevated privileges and neither usable sudo nor su was found."
+  exit 1
 }
 
 install_ansible_linux() {
