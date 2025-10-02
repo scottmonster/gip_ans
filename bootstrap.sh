@@ -1,6 +1,26 @@
 #!/usr/bin/env bash
 # POSIX-friendly bootstrap for gip_ans
+
+VERSION="1"
+DEBUG=true
 set -euo pipefail
+
+if [[ -n "${DEBUG:-}" ]]; then
+  echo "turning on debug"
+  # Enable per-command timing (Bash 5.1+). Ignore if unsupported.
+  if shopt -q xtrace-time 2>/dev/null; then
+    shopt -s xtrace-time
+  else
+    set -o xtrace-time 2>/dev/null || true
+  fi
+
+  # Trace prefix: time file:line:function
+  # export PS4='+ [${EPOCHREALTIME} ${BASH_SOURCE##*/}:${LINENO}:${FUNCNAME[0]}] '
+  export PS4='+ [${EPOCHREALTIME} ${BASH_SOURCE##*/}:${LINENO}] '
+
+  # Turn on xtrace
+  set -x
+fi
 
 log() {
   printf '[bootstrap] %s\n' "$*" >&2
@@ -153,33 +173,34 @@ run_sudo() {
   exit 1
 }
 
-install_deps_linux() {
+install_dependencies_linux() {
   if command -v ansible-playbook >/dev/null 2>&1 \
     && command -v git >/dev/null 2>&1 \
-    && command -v curl >/dev/null 2>&1; then
+    && command -v curl >/dev/null 2>&1 \
+    && command -v tar >/dev/null 2>&1; then
     return
   fi
 
   if command -v apt-get >/dev/null 2>&1; then
-    log "Installing Ansible, git, curl via apt"
+    log "Installing Ansible, git, curl, tar via apt"
     run_sudo apt-get update -y
-    run_sudo apt-get install -y ansible git curl
+    run_sudo apt-get install -y ansible git curl tar
   elif command -v dnf >/dev/null 2>&1; then
-    log "Installing Ansible, git, curl via dnf"
-    run_sudo dnf install -y ansible git curl
+    log "Installing Ansible, git, curl, tar via dnf"
+    run_sudo dnf install -y ansible git curl tar
   elif command -v pacman >/dev/null 2>&1; then
-    log "Installing Ansible, git, curl via pacman"
-    run_sudo pacman -Sy --noconfirm ansible git curl
+    log "Installing Ansible, git, curl, tar via pacman"
+    run_sudo pacman -Sy --noconfirm ansible git curl tar
   elif command -v zypper >/dev/null 2>&1; then
-    log "Installing Ansible, git, curl via zypper"
-    run_sudo zypper -n install ansible git curl
+    log "Installing Ansible, git, curl, tar via zypper"
+    run_sudo zypper -n install ansible git curl tar
   else
-    err "Unsupported package manager. Install Ansible, git, and curl manually, then rerun bootstrap."
+    err "Unsupported package manager. Install Ansible, git, curl, and tar manually, then rerun bootstrap."
     exit 1
   fi
 }
 
-install_deps_macos() {
+install_dependencies_macos() {
   if command -v ansible-playbook >/dev/null 2>&1 \
     && command -v git >/dev/null 2>&1 \
     && command -v curl >/dev/null 2>&1; then
@@ -194,35 +215,55 @@ install_deps_macos() {
   exit 1
 }
 
-install_ansible_windows() {
-  if command -v ansible-playbook >/dev/null 2>&1; then
-    return
+install_dependencies_windows() {
+  if ! command -v ansible-playbook >/dev/null 2>&1; then
+    if command -v pipx >/dev/null 2>&1; then
+      log "Installing ansible-core via pipx"
+      pipx install --include-deps ansible-core >/dev/null 2>&1 || pipx reinstall ansible-core >/dev/null 2>&1 || true
+      ensure_path "$HOME/.local/bin"
+    else
+      err "pipx not found. Install pipx (https://pipx.pypa.io) or Ansible manually before rerunning bootstrap."
+      exit 1
+    fi
   fi
-  if command -v pipx >/dev/null 2>&1; then
-    log "Installing ansible-core via pipx"
-    pipx install --include-deps ansible-core >/dev/null 2>&1 || pipx reinstall ansible-core >/dev/null 2>&1 || true
-    ensure_path "$HOME/.local/bin"
-    return
+
+  if ! command -v git >/dev/null 2>&1; then
+    err "git command not found. Install Git for Windows and rerun bootstrap."
+    exit 1
   fi
-  err "pipx not found. Install pipx (https://pipx.pypa.io) or Ansible manually before rerunning bootstrap."
-  exit 1
+
+  if ! command -v curl >/dev/null 2>&1; then
+    err "curl command not found. Install curl (available via Git for Windows or Windows 11 optional features) and rerun bootstrap."
+    exit 1
+  fi
 }
 
-ensure_ansible() {
+ensure_dependencies() {
   case "$(uname -s)" in
-    Linux*) install_ansible_linux ;;
-    Darwin*) install_ansible_macos ;;
-    CYGWIN*|MINGW*|MSYS*) install_ansible_windows ;;
-    *) err "Unsupported OS: $(uname -s). Install Ansible manually and rerun."; exit 1 ;;
+    Linux*) install_dependencies_linux ;;
+    Darwin*) install_dependencies_macos ;;
+    CYGWIN*|MINGW*|MSYS*) install_dependencies_windows ;;
+    *) err "Unsupported OS: $(uname -s). Install Ansible, git, curl, and tar manually before rerunning."; exit 1 ;;
   esac
 
   if ! command -v ansible-playbook >/dev/null 2>&1; then
     err "ansible-playbook not found after installation attempt. Please install Ansible and rerun."
     exit 1
   fi
+  if ! command -v git >/dev/null 2>&1; then
+    err "git command not found after installation attempt."
+    exit 1
+  fi
+  if ! command -v curl >/dev/null 2>&1; then
+    err "curl command not found after installation attempt."
+    exit 1
+  fi
+  if ! command -v tar >/dev/null 2>&1; then
+    err "tar command not found after installation attempt."
+    exit 1
+  fi
   ensure_path "$HOME/.local/bin"
 }
-
 resolve_vault_password() {
   local repo_vault_file="$1"
   local local_vault_file="$2"
@@ -285,6 +326,8 @@ choose_profile() {
 }
 
 main() {
+  ensure_dependencies
+
   local repo_dir
   repo_dir="$(script_dir)"
   repo_dir="$(ensure_repo "$repo_dir")"
@@ -292,8 +335,6 @@ main() {
     trap cleanup_repo EXIT
   fi
   cd "$repo_dir"
-
-  ensure_ansible
 
   if [ -f "$repo_dir/collections/requirements.yml" ]; then
     log "Installing required Ansible collections"
