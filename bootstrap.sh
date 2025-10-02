@@ -153,40 +153,44 @@ run_sudo() {
   exit 1
 }
 
-install_ansible_linux() {
-  if command -v ansible-playbook >/dev/null 2>&1; then
+install_deps_linux() {
+  if command -v ansible-playbook >/dev/null 2>&1 \
+    && command -v git >/dev/null 2>&1 \
+    && command -v curl >/dev/null 2>&1; then
     return
   fi
 
   if command -v apt-get >/dev/null 2>&1; then
-    log "Installing Ansible via apt"
+    log "Installing Ansible, git, curl via apt"
     run_sudo apt-get update -y
-    run_sudo apt-get install -y ansible
+    run_sudo apt-get install -y ansible git curl
   elif command -v dnf >/dev/null 2>&1; then
-    log "Installing Ansible via dnf"
-    run_sudo dnf install -y ansible
+    log "Installing Ansible, git, curl via dnf"
+    run_sudo dnf install -y ansible git curl
   elif command -v pacman >/dev/null 2>&1; then
-    log "Installing Ansible via pacman"
-    run_sudo pacman -Sy --noconfirm ansible
+    log "Installing Ansible, git, curl via pacman"
+    run_sudo pacman -Sy --noconfirm ansible git curl
   elif command -v zypper >/dev/null 2>&1; then
-    log "Installing Ansible via zypper"
-    run_sudo zypper -n install ansible
+    log "Installing Ansible, git, curl via zypper"
+    run_sudo zypper -n install ansible git curl
   else
-    err "Unsupported package manager. Install Ansible manually or ensure ansible-playbook is on PATH."
+    err "Unsupported package manager. Install Ansible, git, and curl manually, then rerun bootstrap."
     exit 1
   fi
 }
 
-install_ansible_macos() {
-  if command -v ansible-playbook >/dev/null 2>&1; then
+install_deps_macos() {
+  if command -v ansible-playbook >/dev/null 2>&1 \
+    && command -v git >/dev/null 2>&1 \
+    && command -v curl >/dev/null 2>&1; then
     return
   fi
   if command -v brew >/dev/null 2>&1; then
-    log "Installing Ansible via Homebrew"
-    brew install ansible
+    log "Installing Ansible, git, curl via Homebrew"
+    brew install ansible git curl
     return
   fi
-  err "Homebrew not found. Install Homebrew or Ansible manually before rerunning bootstrap."
+  err "Homebrew not found. Install Homebrew and rerun bootstrap or install Ansible, git, and curl manually."
   exit 1
 }
 
