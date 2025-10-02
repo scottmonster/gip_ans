@@ -10,13 +10,9 @@ if [[ -n "${DEBUG:-}" ]]; then
   # Enable per-command timing (Bash 5.1+). Ignore if unsupported.
   if shopt -q xtrace-time 2>/dev/null; then
     shopt -s xtrace-time
-  else
-    set -o xtrace-time 2>/dev/null || true
   fi
 
-  # Trace prefix: time file:line:function
-  # export PS4='+ [${EPOCHREALTIME} ${BASH_SOURCE##*/}:${LINENO}:${FUNCNAME[0]}] '
-  export PS4='+ [${EPOCHREALTIME} ${BASH_SOURCE##*/}:${LINENO}] '
+  export PS4='+ [line:${LINENO}] '
 
   # Turn on xtrace
   set -x
