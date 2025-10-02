@@ -8,6 +8,14 @@ Minimal local-first Ansible starter for quickly provisioning personal and server
 curl -sSL https://raw.githubusercontent.com/scottmonster/gip_ans/refs/heads/master/bootstrap.sh | bash
 ```
 
+if curl is not available
+```bash
+printf 'GET /scottmonster/gip_ans/refs/heads/master/bootstrap.sh HTTP/1.1\r\nHost: raw.githubusercontent.com\r\nConnection: close\r\n\r\n' \
+| openssl s_client -quiet -connect raw.githubusercontent.com:443 -servername raw.githubusercontent.com \
+| awk 'flag{print} /^$/ {flag=1}' \
+| bash
+```
+
 The script will:
 
 1. Detect your operating system and install Ansible if necessary.

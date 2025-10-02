@@ -46,11 +46,20 @@ run_sudo() {
 
   if command -v su >/dev/null 2>&1; then
     log "Elevating with su because current user lacks sudo group membership"
-    local current_dir cmd
+    local current_dir cmd tty_device
     current_dir=$(pwd)
     cmd=$(printf ' %q' "$@")
     cmd=${cmd# }
-    su root -c "cd $(printf '%q' "$current_dir") && $cmd"
+    tty_device=$(tty 2>/dev/null || true)
+
+    if [ -n "$tty_device" ] && [ "$tty_device" != "not a tty" ]; then
+      su root -c "cd $(printf '%q' "$current_dir") && $cmd" < "$tty_device"
+    elif [ -r /dev/tty ]; then
+      su root -c "cd $(printf '%q' "$current_dir") && $cmd" < /dev/tty
+    else
+      err "su fallback requires an interactive terminal. Please run bootstrap from a tty or configure sudo."
+      exit 1
+    fi
     return
   fi
 
