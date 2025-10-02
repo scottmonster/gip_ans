@@ -40,6 +40,58 @@ is_repo_ready() {
   return 0
 }
 
+download_repo() {
+  local repo_url repo_ref temp_parent repo_path archive_url
+  repo_url="${BOOTSTRAP_REPO_URL:-https://github.com/scottmonster/gip_ans.git}"
+  repo_ref="${BOOTSTRAP_REPO_REF:-master}"
+  temp_parent=$(mktemp -d "${TMPDIR:-/tmp}/gip_ans_repo.XXXXXX")
+
+  if command -v git >/dev/null 2>&1; then
+    log "Cloning ${repo_url}#${repo_ref}"
+    if ! git clone --depth=1 --branch "$repo_ref" "$repo_url" "$temp_parent/repo" >/tmp/bootstrap_git.log 2>&1; then
+      err "Failed to clone $repo_url. See /tmp/bootstrap_git.log for details."
+      rm -rf "$temp_parent"
+      exit 1
+    fi
+    repo_path="$temp_parent/repo"
+  else
+    archive_url="${repo_url%.git}/archive/refs/heads/${repo_ref}.tar.gz"
+    if ! command -v curl >/dev/null 2>&1; then
+      err "git is unavailable and curl is missing. Cannot download repository snapshot."
+      rm -rf "$temp_parent"
+      exit 1
+    fi
+    if ! command -v tar >/dev/null 2>&1; then
+      err "tar command not found. Install tar or run bootstrap from a prepared clone."
+      rm -rf "$temp_parent"
+      exit 1
+    fi
+    log "Downloading ${archive_url}"
+    local archive_file="$temp_parent/repo.tar.gz"
+    if ! curl -fsSL "$archive_url" -o "$archive_file" >/tmp/bootstrap_tar.log 2>&1; then
+      err "Failed to download repository archive. See /tmp/bootstrap_tar.log for details."
+      rm -rf "$temp_parent"
+      exit 1
+    fi
+    if ! tar -xzf "$archive_file" -C "$temp_parent" >/tmp/bootstrap_tar.log 2>&1; then
+      err "Failed to extract repository archive. See /tmp/bootstrap_tar.log for details."
+      rm -rf "$temp_parent"
+      exit 1
+    fi
+    rm -f "$archive_file"
+    repo_path=$(find "$temp_parent" -mindepth 1 -maxdepth 1 -type d | head -n1)
+  fi
+
+  if [ -z "$repo_path" ] || ! is_repo_ready "$repo_path"; then
+    err "Downloaded repository does not contain expected files."
+    rm -rf "$temp_parent"
+    exit 1
+  fi
+
+  BOOTSTRAP_CLEANUP_REPO="$temp_parent"
+  printf '%s\n' "$repo_path"
+}
+
 ensure_repo() {
   local candidate="$1"
   if is_repo_ready "$candidate"; then
@@ -56,22 +108,13 @@ ensure_repo() {
     exit 1
   fi
 
-  local repo_url="${BOOTSTRAP_REPO_URL:-https://path-to-repo.git}"
-  if ! command -v git >/dev/null 2>&1; then
-    err "Repository assets not found locally and git is unavailable. Install git or set BOOTSTRAP_REPO_PATH."
-    exit 1
-  fi
+  download_repo
+}
 
-  local temp_dir
-  temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/gip_ans_repo.XXXXXX")
-  log "Cloning repository from $repo_url into $temp_dir"
-  if ! git clone --depth=1 "$repo_url" "$temp_dir" >/tmp/bootstrap_git.log 2>&1; then
-    err "Failed to clone repository from $repo_url. See /tmp/bootstrap_git.log for details."
-    rm -rf "$temp_dir"
-    exit 1
+cleanup_repo() {
+  if [ -n "${BOOTSTRAP_CLEANUP_REPO:-}" ] && [ -d "$BOOTSTRAP_CLEANUP_REPO" ]; then
+    rm -rf "$BOOTSTRAP_CLEANUP_REPO"
   fi
-  BOOTSTRAP_CLEANUP_REPO="$temp_dir"
-  printf '%s\n' "$temp_dir"
 }
 
 run_sudo() {
@@ -242,7 +285,7 @@ main() {
   repo_dir="$(script_dir)"
   repo_dir="$(ensure_repo "$repo_dir")"
   if [ -n "${BOOTSTRAP_CLEANUP_REPO:-}" ]; then
-    trap 'rm -rf "$BOOTSTRAP_CLEANUP_REPO"' EXIT
+    trap cleanup_repo EXIT
   fi
   cd "$repo_dir"
 
