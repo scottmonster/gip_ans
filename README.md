@@ -5,7 +5,7 @@ Minimal local-first Ansible starter for quickly provisioning personal and server
 ## Quick start 🚀
 
 ```bash
-curl -sSL https://path-to-repo/bootstrap.sh | bash
+curl -sSL https://raw.githubusercontent.com/scottmonster/gip_ans/refs/heads/master/bootstrap.sh | bash
 ```
 
 The script will:
