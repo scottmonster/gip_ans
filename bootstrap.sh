@@ -276,11 +276,37 @@ resolve_vault_password() {
     exit 1
   fi
 
-  printf 'Vault password not found locally. Enter bootstrap decryption password: ' >&2
-  stty -echo
-  IFS= read -r bootstrap_pass
-  stty echo
-  printf '\n' >&2
+  local bootstrap_pass=""
+  if [ -n "${BOOTSTRAP_VAULT_PASSWORD:-}" ]; then
+    bootstrap_pass="$BOOTSTRAP_VAULT_PASSWORD"
+  else
+    local prompt_device=""
+    if command -v tty >/dev/null 2>&1; then
+      prompt_device=$(tty 2>/dev/null || true)
+      if [ "$prompt_device" = "not a tty" ]; then
+        prompt_device=""
+      fi
+    fi
+    if [ -z "$prompt_device" ] && [ -r /dev/tty ]; then
+      prompt_device="/dev/tty"
+    fi
+    if [ -z "$prompt_device" ]; then
+      err "No interactive terminal available. Set BOOTSTRAP_VAULT_PASSWORD to provide the vault password."
+      exit 1
+    fi
+
+    printf 'Vault password not found locally. Enter bootstrap decryption password: ' > "$prompt_device"
+    local stty_state=""
+    stty_state=$(stty -g < "$prompt_device" 2>/dev/null || true)
+    if [ -n "$stty_state" ]; then
+      stty -echo < "$prompt_device" 2>/dev/null || true
+    fi
+    IFS= read -r bootstrap_pass < "$prompt_device"
+    printf '\n' > "$prompt_device"
+    if [ -n "$stty_state" ]; then
+      stty "$stty_state" < "$prompt_device" 2>/dev/null || true
+    fi
+  fi
 
   local tmp_pw
   tmp_pw=$(mktemp)
